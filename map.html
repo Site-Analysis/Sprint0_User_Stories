@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Interactive Polygon Drawing Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-freehandshapes/dist/leaflet-freehandshapes.css" />
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+    
+    #map { 
+      flex: 1;
+      height: 100vh; 
+    }
+    
+    .sidebar {
+      width: 400px;
+      background-color: #f8f9fa;
+      padding: 20px;
+      overflow-y: auto;
+      border-left: 1px solid #ddd;
+    }
+    
+    .sun-path-section {
+      background: white;
+      border: 2px solid #007bff;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .sun-path-section h3 {
+      color: #007bff;
+      margin-top: 0;
+    }
+    
+    .form-group {
+      margin-bottom: 12px;
+    }
+    
+    .form-group label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+    
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    
+    .coord-display {
+      background: #e7f3ff;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    
+    .sun-path-image {
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-top: 10px;
+      display: none;
+    }
+    
+    .sun-data {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 12px;
+      display: none;
+    }
+    
+    .sun-data-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .sun-data-item:last-child {
+      border-bottom: none;
+    }
+    
+    .sun-data-label {
+      font-weight: bold;
+      color: #555;
+    }
+    
+    .sun-data-value {
+      color: #007bff;
+      font-family: monospace;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+      font-style: italic;
+    }
+    
+    .error-message {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 12px;
+      display: none;
+    }
+    
+    .output-section {
+      margin-bottom: 20px;
+    }
+    
+    .output-section h3 {
+      margin: 0 0 10px 0;
+      color: #333;
+    }
+    
+    .coordinate-display {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .json-display {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    .btn {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px 5px 5px 0;
+    }
+    
+    .btn:hover {
+      background: #0056b3;
+    }
+    
+    .btn-danger {
+      background: #dc3545;
+    }
+    
+    .btn-danger:hover {
+      background: #c82333;
+    }
+    
+    .btn-success {
+      background: #28a745;
+    }
+    
+    .btn-success:hover {
+      background: #218838;
+    }
+
+    .info {
+      background: #e7f3ff;
+      border: 1px solid #b8daff;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+    
+    /* Custom styles for freehand drawing */
+    .leaflet-draw-draw-freehand {
+      background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNMiAxOGMxLTEgMi0zIDQtM2MyIDAgMyAxIDUgMGMyLTEgMy0yIDUtM2MxLS41IDItMSAyLTJzLTEtMS41LTItMiIgc3Ryb2tlPSIjNDQ0IiBzdHJva2Utd2lkdGg9IjEuNSIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgPGNpcmNsZSBjeD0iMiIgY3k9IjE4IiByPSIxIiBmaWxsPSIjNDQ0Ii8+CiAgPGNpcmNsZSBjeD0iMTgiIGN5PSI4IiByPSIwLjUiIGZpbGw9IiM0NDQiLz4KPC9zdmc+');
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    
+    .freehand-info {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      padding: 8px;
+      border-radius: 4px;
+      margin-top: 10px;
+      font-size: 12px;
+      color: #856404;
+    }
+    
+    /* Time slider styling */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      background: linear-gradient(to right, #ffd700 0%, #ff8c00 50%, #ff6347 100%);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+    }
+    
+    /* Date slider - seasonal gradient */
+    input[type="range"]#sun-date-slider {
+      background: linear-gradient(to right, 
+        #a8d5ff 0%,    /* Winter - light blue */
+        #90ee90 25%,   /* Spring - light green */
+        #ffd700 50%,   /* Summer - gold */
+        #ff8c00 75%,   /* Autumn - orange */
+        #a8d5ff 100%   /* Winter - light blue */
+      );
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      background: #007bff;
+      border: 2px solid white;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    input[type="range"]::-webkit-slider-thumb:hover {
+      background: #0056b3;
+      transform: scale(1.1);
+    }
+    
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: #007bff;
+      border: 2px solid white;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    input[type="range"]::-moz-range-thumb:hover {
+      background: #0056b3;
+      transform: scale(1.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="map"></div>
+    
+    <div class="sidebar">
+      <div class="info">
+        <strong>Instructions:</strong><br>
+        • <strong>Polygon Tool</strong>: Click points to create polygon<br>
+        • <strong>Rectangle Tool</strong>: Click and drag for rectangle<br>
+        • <strong>Freehand Tool</strong>: Click and drag to draw freehand<br>
+        • <strong>Edit/Delete</strong>: Modify or remove existing shapes<br>
+        • <strong>Sun Path</strong>: Click map to set location, then analyze solar position
+      </div>
+      
+      <!-- Sun Path Visualization Section -->
+      <div class="sun-path-section">
+        <h3>☀️ Sun Path Analysis</h3>
+        
+        <div class="coord-display" id="selected-coords">
+          Click on the map to select a location
+        </div>
+        
+        <div class="form-group">
+          <label for="sun-date">Date:</label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="date" id="sun-date" style="flex: 0 0 150px;" />
+            <input type="range" id="sun-date-slider" min="1" max="365" value="1" 
+                   style="flex: 1;" title="Drag to select date" />
+            <span id="sun-date-display" style="font-size: 11px; color: #666; min-width: 80px;">Jan 1</span>
+          </div>
+          <div style="font-size: 10px; color: #888; margin-top: 4px;">
+            Type date or drag slider through the year (Jan 1 - Dec 31)
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="sun-time">Time:</label>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="time" id="sun-time" value="12:00" style="flex: 0 0 120px;" />
+            <input type="range" id="sun-time-slider" min="0" max="1439" value="720" 
+                   style="flex: 1;" title="Drag to select time" />
+            <span id="sun-time-display" style="font-size: 11px; color: #666; min-width: 50px;">12:00</span>
+          </div>
+          <div style="font-size: 10px; color: #888; margin-top: 4px;">
+            Type time or drag slider (00:00 - 23:59)
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="sun-timezone">Timezone:</label>
+          <select id="sun-timezone">
+            <option value="">Auto (from longitude)</option>
+            <option value="UTC">UTC</option>
+            <option value="America/New_York">Eastern (US/Canada)</option>
+            <option value="America/Chicago">Central (US/Canada)</option>
+            <option value="America/Denver">Mountain (US/Canada)</option>
+            <option value="America/Los_Angeles">Pacific (US/Canada)</option>
+            <option value="Europe/London">London</option>
+            <option value="Europe/Paris">Paris</option>
+            <option value="Europe/Berlin">Berlin</option>
+            <option value="Asia/Dubai">Dubai</option>
+            <option value="Asia/Kolkata">India</option>
+            <option value="Asia/Shanghai">Shanghai</option>
+            <option value="Asia/Tokyo">Tokyo</option>
+            <option value="Australia/Sydney">Sydney</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="diagram-type">Diagram Type:</label>
+          <select id="diagram-type">
+            <option value="polar">Polar (Sky View)</option>
+            <option value="cartesian">Cartesian (Azimuth vs Elevation)</option>
+          </select>
+        </div>
+        
+        <button class="btn" onclick="calculateSolarPosition()">Calculate Solar Position</button>
+        <button class="btn btn-success" onclick="generateSunPath()">Generate Sun Path</button>
+        
+        <div id="sun-data" class="sun-data"></div>
+        <div id="error-message" class="error-message"></div>
+        <img id="sun-path-image" class="sun-path-image" alt="Sun Path Diagram" />
+      </div>
+      
+      <div class="output-section">
+        <h3>Polygon Count</h3>
+        <div id="polygon-count">0 polygons drawn</div>
+      </div>
+      
+      <div class="output-section">
+        <h3>Latest Polygon Coordinates</h3>
+        <div id="coordinate-output" class="coordinate-display">
+          Draw a polygon to see coordinates here...
+        </div>
+        <div class="freehand-info">
+          <strong>Note:</strong> Freehand polygons show all captured points plus start/end summary
+        </div>
+      </div>
+      
+      <div class="output-section">
+        <h3>Latest Polygon JSON (GeoJSON)</h3>
+        <div id="json-output" class="json-display">Draw a polygon to see JSON here...</div>
+        <button class="btn" onclick="copyToClipboard()">Copy JSON</button>
+        <button class="btn btn-success" onclick="applyPolygon()">Apply</button>
+      </div>
+      
+      <div class="output-section">
+        <h3>All Polygons JSON</h3>
+        <div id="all-json-output" class="json-display">All polygons will appear here...</div>
+        <button class="btn" onclick="copyAllToClipboard()">Copy All JSON</button>
+        <button class="btn btn-danger" onclick="clearAllPolygons()">Clear All</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-freehandshapes@1.0.1/dist/leaflet-freehandshapes.js"></script>
+  <script>
+    // Initialize map
+    const map = L.map('map').setView([20.5937, 78.9629], 5); // India centered
+
+    // Add basemap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Feature group to store drawn layers
+    const drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
+
+    // Create custom freehand draw handler
+    L.Draw.Freehand = L.Draw.Feature.extend({
+      statics: {
+        TYPE: 'freehand'
+      },
+
+      options: {
+        icon: new L.DivIcon({
+          iconSize: new L.Point(8, 8),
+          className: 'leaflet-div-icon leaflet-editing-icon'
+        }),
+        touchIcon: new L.DivIcon({
+          iconSize: new L.Point(20, 20),
+          className: 'leaflet-div-icon leaflet-editing-icon leaflet-touch-icon'
+        }),
+        shapeOptions: {
+          stroke: true,
+          color: '#f06eaa',
+          weight: 4,
+          opacity: 0.5,
+          fill: true,
+          fillColor: null,
+          fillOpacity: 0.2,
+          clickable: true
+        }
+      },
+
+      initialize: function (map, options) {
+        this.type = L.Draw.Freehand.TYPE;
+        L.Draw.Feature.prototype.initialize.call(this, map, options);
+      },
+
+      addHooks: function () {
+        L.Draw.Feature.prototype.addHooks.call(this);
+        if (this._map) {
+          this._mapDragging = this._map.dragging.enabled();
+          if (this._mapDragging) {
+            this._map.dragging.disable();
+          }
+
+          this._container.style.cursor = 'crosshair';
+          this._tooltip.updateContent({ text: 'Click and drag to draw freehand' });
+
+          L.DomEvent.on(this._container, 'mousedown', this._onMouseDown, this);
+          L.DomEvent.on(this._container, 'touchstart', this._onMouseDown, this);
+        }
+      },
+
+      removeHooks: function () {
+        L.Draw.Feature.prototype.removeHooks.call(this);
+        if (this._map) {
+          if (this._mapDragging) {
+            this._map.dragging.enable();
+          }
+
+          this._container.style.cursor = '';
+          L.DomEvent.off(this._container, 'mousedown', this._onMouseDown, this);
+          L.DomEvent.off(this._container, 'touchstart', this._onMouseDown, this);
+
+          if (this._shape) {
+            this._map.removeLayer(this._shape);
+            delete this._shape;
+          }
+        }
+        delete this._isDrawing;
+        delete this._points;
+      },
+
+      _onMouseDown: function (e) {
+        this._isDrawing = true;
+        this._points = [];
+        
+        L.DomEvent.on(document, 'mousemove', this._onMouseMove, this);
+        L.DomEvent.on(document, 'mouseup', this._onMouseUp, this);
+        L.DomEvent.on(document, 'touchmove', this._onMouseMove, this);
+        L.DomEvent.on(document, 'touchend', this._onMouseUp, this);
+
+        const point = this._map.mouseEventToLatLng(e);
+        this._points.push(point);
+      },
+
+      _onMouseMove: function (e) {
+        if (!this._isDrawing) return;
+
+        const point = this._map.mouseEventToLatLng(e);
+        this._points.push(point);
+
+        if (this._shape) {
+          this._map.removeLayer(this._shape);
+        }
+
+        if (this._points.length > 2) {
+          this._shape = new L.Polygon(this._points, this.options.shapeOptions);
+          this._map.addLayer(this._shape);
+        }
+      },
+
+      _onMouseUp: function () {
+        L.DomEvent.off(document, 'mousemove', this._onMouseMove, this);
+        L.DomEvent.off(document, 'mouseup', this._onMouseUp, this);
+        L.DomEvent.off(document, 'touchmove', this._onMouseMove, this);
+        L.DomEvent.off(document, 'touchend', this._onMouseUp, this);
+
+        if (this._points && this._points.length > 2) {
+          // Close the polygon by adding the first point at the end
+          this._points.push(this._points[0]);
+          
+          if (this._shape) {
+            this._map.removeLayer(this._shape);
+          }
+
+          this._fireCreatedEvent();
+          this.disable();
+        }
+
+        this._isDrawing = false;
+      },
+
+      _fireCreatedEvent: function () {
+        const polygon = new L.Polygon(this._points, this.options.shapeOptions);
+        L.Draw.Feature.prototype._fireCreatedEvent.call(this, polygon);
+      }
+    });
+
+    // Add the freehand draw toolbar
+    L.DrawToolbar.include({
+      getModeHandlers: function (map) {
+        return [
+          {
+            enabled: this.options.polyline,
+            handler: new L.Draw.Polyline(map, this.options.polyline),
+            title: L.drawLocal.draw.toolbar.buttons.polyline
+          },
+          {
+            enabled: this.options.polygon,
+            handler: new L.Draw.Polygon(map, this.options.polygon),
+            title: L.drawLocal.draw.toolbar.buttons.polygon
+          },
+          {
+            enabled: this.options.rectangle,
+            handler: new L.Draw.Rectangle(map, this.options.rectangle),
+            title: L.drawLocal.draw.toolbar.buttons.rectangle
+          },
+          {
+            enabled: this.options.circle,
+            handler: new L.Draw.Circle(map, this.options.circle),
+            title: L.drawLocal.draw.toolbar.buttons.circle
+          },
+          {
+            enabled: this.options.marker,
+            handler: new L.Draw.Marker(map, this.options.marker),
+            title: L.drawLocal.draw.toolbar.buttons.marker
+          },
+          {
+            enabled: this.options.freehand,
+            handler: new L.Draw.Freehand(map, this.options.freehand),
+            title: 'Draw freehand polygon'
+          }
+        ];
+      }
+    });
+
+    // Add draw controls (polygon, rectangle, freehand, and edit tools)
+    const drawControl = new L.Control.Draw({
+      draw: {
+        polyline: false,
+        rectangle: true,
+        circle: false,
+        marker: false,
+        circlemarker: false,
+        polygon: {
+          allowIntersection: false,
+          drawError: {
+            color: '#e1e100',
+            message: '<strong>Error:</strong> Shape edges cannot cross!'
+          },
+          shapeOptions: {
+            color: '#97009c'
+          }
+        },
+        freehand: {
+          shapeOptions: {
+            color: '#f06eaa',
+            weight: 3,
+            fillOpacity: 0.3
+          }
+        }
+      },
+      edit: {
+        featureGroup: drawnItems,
+        remove: true
+      }
+    });
+    map.addControl(drawControl);
+
+    // Array to store all polygons
+    let allPolygons = [];
+
+    // Function to update polygon count
+    function updatePolygonCount() {
+      const count = drawnItems.getLayers().length;
+      document.getElementById('polygon-count').textContent = `${count} polygon${count !== 1 ? 's' : ''} drawn`;
+    }
+
+    // Function to display coordinates in a readable format
+    function displayCoordinates(coordinates) {
+      let output = '';
+      if (coordinates && coordinates.length > 0) {
+        // Handle both polygon and rectangle coordinates
+        const coords = coordinates[0]; // First ring for polygons
+        coords.forEach((coord, index) => {
+          output += `Point ${index + 1}: [${coord[1].toFixed(6)}, ${coord[0].toFixed(6)}]\n`;
+        });
+        
+        // Add summary for freehand polygons
+        if (coords.length > 10) {
+          output += `\n--- Freehand Summary ---\n`;
+          output += `Total Points: ${coords.length}\n`;
+          output += `Start: [${coords[0][1].toFixed(6)}, ${coords[0][0].toFixed(6)}]\n`;
+          output += `End: [${coords[coords.length-1][1].toFixed(6)}, ${coords[coords.length-1][0].toFixed(6)}]\n`;
+        }
+      }
+      document.getElementById('coordinate-output').textContent = output;
+    }
+
+    // Function to update all polygons display
+    function updateAllPolygonsDisplay() {
+      const allGeoJSON = {
+        type: "FeatureCollection",
+        features: allPolygons
+      };
+      document.getElementById('all-json-output').textContent = JSON.stringify(allGeoJSON, null, 2);
+    }
+
+    // Event listener when a shape is created
+    map.on(L.Draw.Event.CREATED, function (event) {
+      const layer = event.layer;
+      drawnItems.addLayer(layer);
+
+      // Convert to GeoJSON
+      const geojson = layer.toGeoJSON();
+      
+      // Add to allPolygons array
+      allPolygons.push(geojson);
+
+      // Display in sidebar
+      document.getElementById('json-output').textContent = JSON.stringify(geojson, null, 2);
+      
+      // Display coordinates
+      if (geojson.geometry && geojson.geometry.coordinates) {
+        displayCoordinates(geojson.geometry.coordinates);
+      }
+
+      // Update polygon count
+      updatePolygonCount();
+      
+      // Update all polygons display
+      updateAllPolygonsDisplay();
+
+      // Log to console for debugging
+      console.log('New polygon created:', geojson);
+      console.log('All polygons:', allPolygons);
+    });
+
+    // Event listener when a shape is edited
+    map.on(L.Draw.Event.EDITED, function (event) {
+      const layers = event.layers;
+      layers.eachLayer(function (layer) {
+        const geojson = layer.toGeoJSON();
+        
+        // Find and update the polygon in allPolygons array
+        const layerId = drawnItems.getLayerId(layer);
+        const index = allPolygons.findIndex((p, i) => i === layerId - 1);
+        if (index !== -1) {
+          allPolygons[index] = geojson;
+        }
+
+        // Update displays
+        document.getElementById('json-output').textContent = JSON.stringify(geojson, null, 2);
+        if (geojson.geometry && geojson.geometry.coordinates) {
+          displayCoordinates(geojson.geometry.coordinates);
+        }
+        updateAllPolygonsDisplay();
+
+        console.log('Polygon edited:', geojson);
+      });
+    });
+
+    // Event listener when a shape is deleted
+    map.on(L.Draw.Event.DELETED, function (event) {
+      const layers = event.layers;
+      layers.eachLayer(function (layer) {
+        // Remove from allPolygons array
+        const layerId = drawnItems.getLayerId(layer);
+        allPolygons.splice(layerId - 1, 1);
+      });
+
+      // Update displays
+      updatePolygonCount();
+      updateAllPolygonsDisplay();
+      
+      // Clear single polygon display if no polygons left
+      if (allPolygons.length === 0) {
+        document.getElementById('coordinate-output').textContent = 'Draw a polygon to see coordinates here...';
+        document.getElementById('json-output').textContent = 'Draw a polygon to see JSON here...';
+      } else {
+        // Show the last polygon
+        const lastPolygon = allPolygons[allPolygons.length - 1];
+        document.getElementById('json-output').textContent = JSON.stringify(lastPolygon, null, 2);
+        if (lastPolygon.geometry && lastPolygon.geometry.coordinates) {
+          displayCoordinates(lastPolygon.geometry.coordinates);
+        }
+      }
+
+      console.log('Polygon deleted. Remaining polygons:', allPolygons);
+    });
+
+    // Function to copy JSON to clipboard
+    function copyToClipboard() {
+      const jsonText = document.getElementById('json-output').textContent;
+      if (jsonText && jsonText !== 'Draw a polygon to see JSON here...') {
+        navigator.clipboard.writeText(jsonText).then(function() {
+          alert('JSON copied to clipboard!');
+        }).catch(function(err) {
+          console.error('Failed to copy: ', err);
+          // Fallback for older browsers
+          const textArea = document.createElement('textarea');
+          textArea.value = jsonText;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          alert('JSON copied to clipboard!');
+        });
+      } else {
+        alert('No polygon data to copy!');
+      }
+    }
+
+    // Function to copy all polygons JSON to clipboard
+    function copyAllToClipboard() {
+      const jsonText = document.getElementById('all-json-output').textContent;
+      if (jsonText && jsonText !== 'All polygons will appear here...') {
+        navigator.clipboard.writeText(jsonText).then(function() {
+          alert('All polygons JSON copied to clipboard!');
+        }).catch(function(err) {
+          console.error('Failed to copy: ', err);
+          // Fallback for older browsers
+          const textArea = document.createElement('textarea');
+          textArea.value = jsonText;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          alert('All polygons JSON copied to clipboard!');
+        });
+      } else {
+        alert('No polygon data to copy!');
+      }
+    }
+
+    // Function to clear all polygons
+    function clearAllPolygons() {
+      if (allPolygons.length > 0) {
+        if (confirm('Are you sure you want to clear all polygons?')) {
+          drawnItems.clearLayers();
+          allPolygons = [];
+          updatePolygonCount();
+          document.getElementById('coordinate-output').textContent = 'Draw a polygon to see coordinates here...';
+          document.getElementById('json-output').textContent = 'Draw a polygon to see JSON here...';
+          document.getElementById('all-json-output').textContent = 'All polygons will appear here...';
+          console.log('All polygons cleared');
+        }
+      } else {
+        alert('No polygons to clear!');
+      }
+    }
+
+    // Function to apply polygon data
+    function applyPolygon() {
+      const jsonText = document.getElementById('json-output').textContent;
+      if (jsonText && jsonText !== 'Draw a polygon to see JSON here...') {
+        try {
+          const geojsonData = JSON.parse(jsonText);
+          
+          // Here you can add custom logic for what "Apply" should do
+          // For now, it will highlight the polygon and show a confirmation
+          
+          // Find the latest polygon layer and highlight it
+          const layers = drawnItems.getLayers();
+          if (layers.length > 0) {
+            const latestLayer = layers[layers.length - 1];
+            
+            // Temporarily change the style to highlight
+            const originalStyle = latestLayer.options;
+            latestLayer.setStyle({
+              color: '#ff0000',
+              weight: 5,
+              fillOpacity: 0.7
+            });
+            
+            // Revert after 2 seconds
+            setTimeout(() => {
+              latestLayer.setStyle(originalStyle);
+            }, 2000);
+          }
+          
+          // You can customize this function based on your needs:
+          // - Send data to a server
+          // - Process coordinates for analysis
+          // - Export to different formats
+          // - Integrate with other systems
+          
+          alert('Polygon applied successfully!\n\nCoordinates: ' + 
+                geojsonData.geometry.coordinates[0].length + ' points\n' +
+                'Type: ' + geojsonData.geometry.type + '\n\n' +
+                'You can customize the applyPolygon() function\nto perform specific actions with your polygon data.');
+          
+          console.log('Applied polygon:', geojsonData);
+          
+        } catch (error) {
+          alert('Error applying polygon: Invalid JSON data');
+          console.error('Apply error:', error);
+        }
+      } else {
+        alert('No polygon data to apply!');
+      }
+    }
+
+    // Initialize displays
+    updatePolygonCount();
+
+    // ============================================================================
+    // SUN PATH INTEGRATION
+    // ============================================================================
+    
+    // API endpoint configuration
+    const API_BASE_URL = 'http://localhost:8000';
+    
+    // Store selected location
+    let selectedLocation = null;
+    let locationMarker = null;
+    
+    // Set default date to today
+    document.getElementById('sun-date').valueAsDate = new Date();
+    
+    // Date slider synchronization
+    const dateInput = document.getElementById('sun-date');
+    const dateSlider = document.getElementById('sun-date-slider');
+    const dateDisplay = document.getElementById('sun-date-display');
+    
+    // Convert date string (YYYY-MM-DD) to day of year (1-365/366)
+    function dateToDayOfYear(dateStr) {
+      if (!dateStr) {
+        const today = new Date();
+        const start = new Date(today.getFullYear(), 0, 0);
+        const diff = today - start;
+        const oneDay = 1000 * 60 * 60 * 24;
+        return Math.floor(diff / oneDay);
+      }
+      const date = new Date(dateStr);
+      const start = new Date(date.getFullYear(), 0, 0);
+      const diff = date - start;
+      const oneDay = 1000 * 60 * 60 * 24;
+      return Math.floor(diff / oneDay);
+    }
+    
+    // Convert day of year (1-365) to date string (YYYY-MM-DD) for current year
+    function dayOfYearToDate(day) {
+      const year = new Date().getFullYear();
+      const date = new Date(year, 0, day);
+      return date.toISOString().split('T')[0];
+    }
+    
+    // Format date for display (e.g., "Jan 1", "Dec 31")
+    function formatDateDisplay(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${months[date.getMonth()]} ${date.getDate()}`;
+    }
+    
+    // Update slider when date input changes
+    dateInput.addEventListener('change', function() {
+      const dayOfYear = dateToDayOfYear(this.value);
+      dateSlider.value = dayOfYear;
+      dateDisplay.textContent = formatDateDisplay(this.value);
+    });
+    
+    // Update date input when slider changes
+    dateSlider.addEventListener('input', function() {
+      const dateStr = dayOfYearToDate(parseInt(this.value));
+      dateInput.value = dateStr;
+      dateDisplay.textContent = formatDateDisplay(dateStr);
+    });
+    
+    // Initialize date display
+    const todayDayOfYear = dateToDayOfYear(dateInput.value);
+    dateSlider.value = todayDayOfYear;
+    dateDisplay.textContent = formatDateDisplay(dateInput.value);
+    
+    // Time slider synchronization
+    const timeInput = document.getElementById('sun-time');
+    const timeSlider = document.getElementById('sun-time-slider');
+    const timeDisplay = document.getElementById('sun-time-display');
+    
+    // Convert time string (HH:MM) to minutes since midnight
+    function timeToMinutes(timeStr) {
+      if (!timeStr) return 720; // Default to noon
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+    }
+    
+    // Convert minutes since midnight to time string (HH:MM)
+    function minutesToTime(minutes) {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+    
+    // Update slider when time input changes
+    timeInput.addEventListener('change', function() {
+      const minutes = timeToMinutes(this.value);
+      timeSlider.value = minutes;
+      timeDisplay.textContent = this.value;
+    });
+    
+    // Update time input when slider changes
+    timeSlider.addEventListener('input', function() {
+      const timeStr = minutesToTime(parseInt(this.value));
+      timeInput.value = timeStr;
+      timeDisplay.textContent = timeStr;
+    });
+    
+    // Initialize display
+    timeDisplay.textContent = timeInput.value;
+    
+    // Add click handler to map for location selection
+    map.on('click', function(e) {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+      
+      // Store location
+      selectedLocation = { lat, lng };
+      
+      // Update display
+      document.getElementById('selected-coords').innerHTML = 
+        `<strong>Selected Location:</strong><br>` +
+        `Latitude: ${lat.toFixed(6)}°<br>` +
+        `Longitude: ${lng.toFixed(6)}°`;
+      
+      // Add or update marker
+      if (locationMarker) {
+        map.removeLayer(locationMarker);
+      }
+      
+      locationMarker = L.marker([lat, lng], {
+        icon: L.icon({
+          iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxMiIgZmlsbD0iI2ZmYzEwNyIgc3Ryb2tlPSIjZmY5ODAwIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSI0IiBmaWxsPSIjZmY5ODAwIi8+Cjwvc3ZnPg==',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        })
+      }).addTo(map);
+      
+      locationMarker.bindPopup(`<b>Sun Path Analysis Location</b><br>Lat: ${lat.toFixed(6)}°<br>Lng: ${lng.toFixed(6)}°`).openPopup();
+    });
+    
+    /**
+     * Calculate solar position for a specific time
+     */
+    async function calculateSolarPosition() {
+      // Validate location
+      if (!selectedLocation) {
+        showError('Please select a location on the map first');
+        return;
+      }
+      
+      // Get form values
+      const date = document.getElementById('sun-date').value;
+      const time = document.getElementById('sun-time').value;
+      const timezone = document.getElementById('sun-timezone').value;
+      
+      if (!date) {
+        showError('Please select a date');
+        return;
+      }
+      
+      // Show loading
+      const sunDataDiv = document.getElementById('sun-data');
+      sunDataDiv.style.display = 'block';
+      sunDataDiv.innerHTML = '<div class="loading">Calculating solar position...</div>';
+      hideError();
+      
+      try {
+        // Prepare request
+        const requestData = {
+          latitude: selectedLocation.lat,
+          longitude: selectedLocation.lng,
+          date: date,
+          timezone: timezone || null
+        };
+        
+        if (time) {
+          requestData.time = time;
+        }
+        
+        // Make API call
+        const response = await fetch(`${API_BASE_URL}/solar-position`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to calculate solar position');
+        }
+        
+        const data = await response.json();
+        
+        // Display results
+        displaySolarData(data);
+        
+        console.log('Solar position data:', data);
+        
+      } catch (error) {
+        console.error('Error calculating solar position:', error);
+        showError(`Error: ${error.message}`);
+        sunDataDiv.style.display = 'none';
+      }
+    }
+    
+    /**
+     * Generate sun path diagram
+     */
+    async function generateSunPath() {
+      // Validate location
+      if (!selectedLocation) {
+        showError('Please select a location on the map first');
+        return;
+      }
+      
+      // Get form values
+      const date = document.getElementById('sun-date').value;
+      const time = document.getElementById('sun-time').value;
+      const timezone = document.getElementById('sun-timezone').value;
+      const diagramType = document.getElementById('diagram-type').value;
+      
+      if (!date) {
+        showError('Please select a date');
+        return;
+      }
+      
+      // Show loading
+      const imgElement = document.getElementById('sun-path-image');
+      imgElement.style.display = 'block';
+      imgElement.src = '';
+      imgElement.alt = 'Generating sun path diagram...';
+      hideError();
+      
+      try {
+        // Prepare request
+        const requestData = {
+          latitude: selectedLocation.lat,
+          longitude: selectedLocation.lng,
+          date: date,
+          diagram_type: diagramType,
+          timezone: timezone || null
+        };
+        
+        if (time) {
+          requestData.current_time = time;
+        }
+        
+        // Make API call
+        const response = await fetch(`${API_BASE_URL}/sun-path`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to generate sun path diagram');
+        }
+        
+        // Convert response to blob and create object URL
+        const blob = await response.blob();
+        const imageUrl = URL.createObjectURL(blob);
+        
+        imgElement.src = imageUrl;
+        imgElement.alt = 'Sun Path Diagram';
+        
+        console.log('Sun path diagram generated successfully');
+        
+      } catch (error) {
+        console.error('Error generating sun path:', error);
+        showError(`Error: ${error.message}`);
+        imgElement.style.display = 'none';
+      }
+    }
+    
+    /**
+     * Display solar position data
+     */
+    function displaySolarData(data) {
+      const sunDataDiv = document.getElementById('sun-data');
+      
+      let html = '<h4 style="margin-top: 0;">Solar Position Data</h4>';
+      
+      html += `
+        <div class="sun-data-item">
+          <span class="sun-data-label">Date:</span>
+          <span class="sun-data-value">${data.date}</span>
+        </div>
+        <div class="sun-data-item">
+          <span class="sun-data-label">Time:</span>
+          <span class="sun-data-value">${data.time}</span>
+        </div>
+        <div class="sun-data-item">
+          <span class="sun-data-label">Timezone:</span>
+          <span class="sun-data-value">${data.timezone}</span>
+        </div>
+        <div class="sun-data-item">
+          <span class="sun-data-label">Solar Azimuth:</span>
+          <span class="sun-data-value">${data.solar_azimuth}° ${getCompassDirection(data.solar_azimuth)}</span>
+        </div>
+        <div class="sun-data-item">
+          <span class="sun-data-label">Solar Elevation:</span>
+          <span class="sun-data-value">${data.solar_elevation}°</span>
+        </div>
+        <div class="sun-data-item">
+          <span class="sun-data-label">Solar Zenith:</span>
+          <span class="sun-data-value">${data.solar_zenith}°</span>
+        </div>
+      `;
+      
+      if (data.sunrise) {
+        html += `
+          <div class="sun-data-item">
+            <span class="sun-data-label">Sunrise:</span>
+            <span class="sun-data-value">${data.sunrise}</span>
+          </div>
+        `;
+      }
+      
+      if (data.sunset) {
+        html += `
+          <div class="sun-data-item">
+            <span class="sun-data-label">Sunset:</span>
+            <span class="sun-data-value">${data.sunset}</span>
+          </div>
+        `;
+      }
+      
+      if (data.solar_noon) {
+        html += `
+          <div class="sun-data-item">
+            <span class="sun-data-label">Solar Noon:</span>
+            <span class="sun-data-value">${data.solar_noon}</span>
+          </div>
+        `;
+      }
+      
+      if (data.day_length) {
+        html += `
+          <div class="sun-data-item">
+            <span class="sun-data-label">Day Length:</span>
+            <span class="sun-data-value">${data.day_length} hours</span>
+          </div>
+        `;
+      }
+      
+      sunDataDiv.innerHTML = html;
+      sunDataDiv.style.display = 'block';
+    }
+    
+    /**
+     * Get compass direction from azimuth angle
+     */
+    function getCompassDirection(azimuth) {
+      const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 
+                         'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      const index = Math.round(azimuth / 22.5) % 16;
+      return `(${directions[index]})`;
+    }
+    
+    /**
+     * Show error message
+     */
+    function showError(message) {
+      const errorDiv = document.getElementById('error-message');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+    }
+    
+    /**
+     * Hide error message
+     */
+    function hideError() {
+      const errorDiv = document.getElementById('error-message');
+      errorDiv.style.display = 'none';
+    }
+  </script>
+</body>
+</html>

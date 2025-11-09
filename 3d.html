@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>3D Solar & Shadow Analysis Sandbox</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+    }
+    
+    .container {
+      display: flex;
+      height: 100vh;
+    }
+    
+    /* Left Panel - 2D Map */
+    .map-panel {
+      width: 100%;
+      position: relative;
+      border-right: 3px solid #2c3e50;
+    }
+    
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* Right Panel - 3D Viewport */
+    .viewport-panel {
+      width: 60%;
+      position: absolute;
+      right: 0;
+      top: 0;
+      height: 100vh;
+      background: linear-gradient(to bottom, #87CEEB 0%, #f0f0f0 100%);
+      transition: transform 0.3s ease;
+      z-index: 500;
+      box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+    }
+    
+    .viewport-panel.collapsed {
+      transform: translateX(100%);
+    }
+    
+    #viewport-3d {
+      width: 100%;
+      height: 100%;
+    }
+    
+    /* Control Panel Overlay */
+    .control-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      max-width: 350px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      z-index: 1000;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    
+    .control-panel.collapsed {
+      transform: translateX(-100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .control-panel h2 {
+      margin: 0 0 15px 0;
+      color: #2c3e50;
+      font-size: 20px;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #7f8c8d;
+      transition: color 0.3s;
+      padding: 0;
+      line-height: 1;
+    }
+    
+    .close-btn:hover {
+      color: #e74c3c;
+    }
+    
+    .control-section {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+    
+    .control-section h3 {
+      margin: 0 0 12px 0;
+      font-size: 14px;
+      color: #34495e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .form-group {
+      margin-bottom: 12px;
+    }
+    
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 5px;
+      font-size: 13px;
+      color: #555;
+    }
+    
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: border-color 0.3s;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #3498db;
+    }
+    
+    /* Range Slider Styling */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      background: linear-gradient(to right, #3498db 0%, #2ecc71 100%);
+      border-radius: 3px;
+      outline: none;
+    }
+    
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      background: #3498db;
+      border: 2px solid white;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      background: #3498db;
+      border: 2px solid white;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    
+    .slider-value {
+      display: inline-block;
+      min-width: 50px;
+      text-align: right;
+      font-weight: 600;
+      color: #3498db;
+      font-size: 12px;
+    }
+    
+    /* Buttons */
+    .btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.3s;
+      margin: 5px 5px 5px 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+    }
+    
+    .btn-success {
+      background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+      color: white;
+    }
+    
+    .btn-success:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(46, 204, 113, 0.4);
+    }
+    
+    .btn-danger {
+      background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+      color: white;
+    }
+    
+    .btn-danger:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+    }
+    
+    .btn-warning {
+      background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+      color: white;
+    }
+    
+    .btn-warning:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(243, 156, 18, 0.4);
+    }
+    
+    /* Info Display */
+    .info-display {
+      background: #e8f4f8;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      margin-top: 10px;
+      border-left: 4px solid #3498db;
+    }
+    
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+    }
+    
+    .info-label {
+      font-weight: 600;
+      color: #34495e;
+    }
+    
+    .info-value {
+      color: #3498db;
+    }
+    
+    /* Status Indicator */
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+      animation: pulse 2s infinite;
+    }
+    
+    .status-ready {
+      background: #2ecc71;
+    }
+    
+    .status-loading {
+      background: #f39c12;
+    }
+    
+    .status-error {
+      background: #e74c3c;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* Drawing Mode Selector */
+    .mode-selector {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+    
+    .mode-btn {
+      flex: 1;
+      padding: 8px;
+      border: 2px solid #ddd;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: center;
+    }
+    
+    .mode-btn.active {
+      background: #3498db;
+      color: white;
+      border-color: #3498db;
+    }
+    
+    .mode-btn:hover {
+      border-color: #3498db;
+    }
+    
+    /* 3D Viewport Controls */
+    .viewport-controls {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 1000;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+    
+    .viewport-controls.collapsed {
+      transform: translateY(100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+    
+    .viewport-controls h4 {
+      margin: 0 0 10px 0;
+      font-size: 12px;
+      color: #34495e;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    /* Loading Overlay */
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    
+    .loading-overlay.active {
+      display: flex;
+    }
+    
+    .loading-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .loading-text {
+      color: white;
+      margin-left: 20px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    /* Toggle Buttons */
+    .toggle-btn {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.95);
+      border: 2px solid #3498db;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 999;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      font-size: 20px;
+    }
+    
+    .toggle-btn:hover {
+      background: #3498db;
+      color: white;
+      transform: scale(1.1);
+    }
+    
+    .toggle-control-panel {
+      top: 20px;
+      left: 20px;
+    }
+    
+    .toggle-control-panel.hidden {
+      display: none;
+    }
+    
+    .toggle-viewport-controls {
+      bottom: 20px;
+      right: 20px;
+    }
+    
+    .toggle-viewport-controls.hidden {
+      display: none;
+    }
+    
+    .toggle-viewport-panel {
+      top: 50%;
+      left: -22px;
+      transform: translateY(-50%);
+      border-radius: 50% 0 0 50%;
+      width: 44px;
+      padding-left: 8px;
+      justify-content: flex-start;
+      z-index: 501;
+    }
+    
+    .toggle-viewport-panel.show-panel {
+      position: fixed;
+      right: 0;
+      left: auto;
+      top: 50%;
+      transform: translateY(-50%);
+      border-radius: 50% 0 0 50%;
+      z-index: 1001;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Left Panel: 2D Map Selection -->
+    <div class="map-panel">
+      <div id="map"></div>
+      
+      <!-- Toggle Button for Control Panel -->
+      <div class="toggle-btn toggle-control-panel hidden" onclick="toggleControlPanel()" title="Show Control Panel">
+        ☰
+      </div>
+      
+      <div class="control-panel" id="control-panel">
+        <h2>
+          🌍 Area Selection
+          <button class="close-btn" onclick="toggleControlPanel()" title="Close">×</button>
+        </h2>
+        
+        <!-- Drawing Mode Selection -->
+        <div class="control-section">
+          <h3>Selection Mode</h3>
+          <div class="mode-selector">
+            <div class="mode-btn active" data-mode="point" onclick="setDrawMode('point')">
+              📍 Point
+            </div>
+            <div class="mode-btn" data-mode="polygon" onclick="setDrawMode('polygon')">
+              ⬡ Polygon
+            </div>
+            <div class="mode-btn" data-mode="freehand" onclick="setDrawMode('freehand')">
+              ✏️ Freehand
+            </div>
+          </div>
+          
+          <!-- Buffer Radius (for point mode) -->
+          <div id="buffer-controls">
+            <div class="form-group">
+              <label>Buffer Radius: <span class="slider-value" id="radius-value">500m</span></label>
+              <input type="range" id="buffer-radius" min="50" max="2000" value="500" step="50" 
+                     oninput="updateBufferRadius(this.value)">
+            </div>
+          </div>
+        </div>
+        
+        <!-- Location Info -->
+        <div class="control-section">
+          <h3>Selected Area</h3>
+          <div class="info-display" id="location-info">
+            <div class="info-item">
+              <span class="info-label">Status:</span>
+              <span class="info-value">
+                <span class="status-indicator status-ready"></span>Ready
+              </span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Center:</span>
+              <span class="info-value" id="center-coords">Not selected</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Area:</span>
+              <span class="info-value" id="area-size">0 m²</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Date & Time Controls -->
+        <div class="control-section">
+          <h3>☀️ Solar Analysis</h3>
+          
+          <div class="form-group">
+            <label>Date:</label>
+            <input type="date" id="analysis-date">
+          </div>
+          
+          <div class="form-group">
+            <label>Time: <span class="slider-value" id="time-value">12:00</span></label>
+            <input type="range" id="time-slider" min="0" max="1439" value="720" 
+                   oninput="updateTimeDisplay(this.value)">
+          </div>
+          
+          <div class="form-group">
+            <label>Timezone:</label>
+            <select id="timezone">
+              <option value="">Auto (from location)</option>
+              <option value="UTC">UTC</option>
+              <option value="America/New_York">Eastern (US)</option>
+              <option value="America/Chicago">Central (US)</option>
+              <option value="America/Denver">Mountain (US)</option>
+              <option value="America/Los_Angeles">Pacific (US)</option>
+              <option value="Europe/London">London</option>
+              <option value="Europe/Paris">Paris</option>
+              <option value="Asia/Tokyo">Tokyo</option>
+              <option value="Asia/Shanghai">Shanghai</option>
+              <option value="Asia/Kolkata">India</option>
+              <option value="Australia/Sydney">Sydney</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="control-section">
+          <button class="btn btn-primary" onclick="fetchBuildingData()">
+            🏢 Load Buildings
+          </button>
+          <button class="btn btn-success" onclick="generate3DView()">
+            🎬 Generate 3D View
+          </button>
+          <button class="btn btn-warning" onclick="analyzeShadows()">
+            🌓 Analyze Shadows
+          </button>
+          <button class="btn btn-danger" onclick="clearSelection()">
+            🗑️ Clear All
+          </button>
+        </div>
+        
+        <!-- 3D Viewport Toggle -->
+        <div class="control-section">
+          <button class="btn btn-primary" onclick="toggleViewportPanel()" style="width: 100%;">
+            <span id="viewport-toggle-text">🏙️ Show 3D Viewport</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Right Panel: 3D Viewport -->
+    <div class="viewport-panel collapsed" id="viewport-panel">
+      <!-- Toggle Button for Viewport Panel -->
+      <div class="toggle-btn toggle-viewport-panel show-panel" onclick="toggleViewportPanel()" title="Show 3D Viewport">
+        🏙️
+      </div>
+      
+      <div id="viewport-3d">
+        <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #7f8c8d; font-size: 18px;">
+          <div style="text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 20px;">🏙️</div>
+            <div>Select an area on the map to begin</div>
+            <div style="font-size: 14px; margin-top: 10px; color: #95a5a6;">
+              3D visualization will appear here
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Toggle Button for Viewport Controls -->
+      <div class="toggle-btn toggle-viewport-controls" onclick="toggleViewportControls()" title="Show Camera Controls">
+        🎮
+      </div>
+      
+      <!-- 3D Viewport Controls -->
+      <div class="viewport-controls collapsed" id="viewport-controls">
+        <h4>
+          Camera Controls
+          <button class="close-btn" onclick="toggleViewportControls()" title="Close" style="font-size: 18px;">×</button>
+        </h4>
+        <div style="font-size: 11px; color: #7f8c8d;">
+          <div>🖱️ Left Drag: Rotate</div>
+          <div>🖱️ Right Drag: Pan</div>
+          <div>🖱️ Scroll: Zoom</div>
+        </div>
+      </div>
+      
+      <!-- Loading Overlay -->
+      <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Processing...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/controls/OrbitControls.js"></script>
+  
+  <script>
+    // ============================================================================
+    // GLOBAL STATE
+    // ============================================================================
+    
+    let map;
+    let drawnItems;
+    let currentMode = 'point';
+    let selectedPoint = null;
+    let bufferCircle = null;
+    let selectedPolygon = null;
+    let currentDrawControl = null;
+    let buildings = [];
+    
+    // Three.js scene (will be initialized when backend integration is complete)
+    let scene, camera, renderer, controls;
+    let buildingMeshes = [];
+    let sunMarker = null;
+    
+    // ============================================================================
+    // MAP INITIALIZATION
+    // ============================================================================
+    
+    function initMap() {
+      map = L.map('map').setView([20.5937, 78.9629], 5); // India default
+      
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(map);
+      
+      drawnItems = new L.FeatureGroup();
+      map.addLayer(drawnItems);
+      
+      // Initialize drawing controls
+      initDrawingControls();
+      
+      // Set default date to today
+      document.getElementById('analysis-date').valueAsDate = new Date();
+    }
+    
+    // ============================================================================
+    // DRAWING CONTROLS
+    // ============================================================================
+    
+    function initDrawingControls() {
+      // Point mode: click on map
+      map.on('click', function(e) {
+        if (currentMode === 'point') {
+          handlePointSelection(e.latlng);
+        }
+      });
+      
+      // Enable polygon/freehand drawing
+      setDrawMode('point');
+    }
+    
+    function setDrawMode(mode) {
+      currentMode = mode;
+      
+      // Update UI
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+      
+      // Show/hide buffer controls
+      document.getElementById('buffer-controls').style.display = 
+        mode === 'point' ? 'block' : 'none';
+      
+      // Remove existing draw control
+      if (currentDrawControl) {
+        map.removeControl(currentDrawControl);
+        currentDrawControl = null;
+      }
+      
+      // Clear existing selections
+      clearSelection();
+      
+      // Add appropriate drawing control
+      if (mode === 'polygon') {
+        currentDrawControl = new L.Control.Draw({
+          draw: {
+            polygon: {
+              allowIntersection: false,
+              shapeOptions: { color: '#3498db', weight: 3 }
+            },
+            polyline: false,
+            rectangle: false,
+            circle: false,
+            marker: false,
+            circlemarker: false
+          },
+          edit: {
+            featureGroup: drawnItems,
+            remove: false
+          }
+        });
+        map.addControl(currentDrawControl);
+        
+        map.on(L.Draw.Event.CREATED, function(e) {
+          handlePolygonDrawn(e.layer);
+        });
+      } else if (mode === 'freehand') {
+        // Simplified freehand mode
+        let isDrawing = false;
+        let points = [];
+        
+        map.on('mousedown', function(e) {
+          if (currentMode === 'freehand') {
+            isDrawing = true;
+            points = [e.latlng];
+          }
+        });
+        
+        map.on('mousemove', function(e) {
+          if (isDrawing && currentMode === 'freehand') {
+            points.push(e.latlng);
+            if (selectedPolygon) {
+              map.removeLayer(selectedPolygon);
+            }
+            selectedPolygon = L.polygon(points, { color: '#e74c3c', weight: 3 }).addTo(map);
+          }
+        });
+        
+        map.on('mouseup', function(e) {
+          if (isDrawing && currentMode === 'freehand') {
+            isDrawing = false;
+            if (points.length > 2) {
+              handlePolygonDrawn(selectedPolygon);
+            }
+          }
+        });
+      }
+    }
+    
+    function handlePointSelection(latlng) {
+      // Remove previous selections
+      if (selectedPoint) map.removeLayer(selectedPoint);
+      if (bufferCircle) map.removeLayer(bufferCircle);
+      
+      // Add marker
+      selectedPoint = L.marker(latlng, {
+        icon: L.icon({
+          iconUrl: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxNiIgY3k9IjE2IiByPSIxMCIgZmlsbD0iIzM0OThkYiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        })
+      }).addTo(map);
+      
+      // Add buffer circle
+      const radiusMeters = parseInt(document.getElementById('buffer-radius').value);
+      bufferCircle = L.circle(latlng, {
+        radius: radiusMeters,
+        color: '#3498db',
+        fillColor: '#3498db',
+        fillOpacity: 0.2,
+        weight: 2
+      }).addTo(map);
+      
+      // Update info
+      updateLocationInfo(latlng, radiusMeters);
+    }
+    
+    function handlePolygonDrawn(layer) {
+      if (selectedPolygon && selectedPolygon !== layer) {
+        map.removeLayer(selectedPolygon);
+      }
+      selectedPolygon = layer;
+      drawnItems.addLayer(layer);
+      
+      // Calculate area
+      const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+      const center = layer.getBounds().getCenter();
+      
+      updateLocationInfo(center, null, area);
+    }
+    
+    function updateLocationInfo(latlng, radius = null, area = null) {
+      document.getElementById('center-coords').textContent = 
+        `${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
+      
+      if (radius) {
+        const bufferArea = Math.PI * radius * radius;
+        document.getElementById('area-size').textContent = 
+          `${bufferArea.toFixed(0)} m²`;
+      } else if (area) {
+        document.getElementById('area-size').textContent = 
+          `${area.toFixed(0)} m²`;
+      }
+    }
+    
+    function updateBufferRadius(value) {
+      document.getElementById('radius-value').textContent = `${value}m`;
+      
+      // Update buffer circle if point is selected
+      if (selectedPoint && bufferCircle) {
+        const latlng = selectedPoint.getLatLng();
+        map.removeLayer(bufferCircle);
+        bufferCircle = L.circle(latlng, {
+          radius: parseInt(value),
+          color: '#3498db',
+          fillColor: '#3498db',
+          fillOpacity: 0.2,
+          weight: 2
+        }).addTo(map);
+        
+        updateLocationInfo(latlng, parseInt(value));
+      }
+    }
+    
+    function updateTimeDisplay(minutes) {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      const timeStr = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+      document.getElementById('time-value').textContent = timeStr;
+    }
+    
+    function clearSelection() {
+      if (selectedPoint) {
+        map.removeLayer(selectedPoint);
+        selectedPoint = null;
+      }
+      if (bufferCircle) {
+        map.removeLayer(bufferCircle);
+        bufferCircle = null;
+      }
+      if (selectedPolygon) {
+        map.removeLayer(selectedPolygon);
+        selectedPolygon = null;
+      }
+      drawnItems.clearLayers();
+      
+      document.getElementById('center-coords').textContent = 'Not selected';
+      document.getElementById('area-size').textContent = '0 m²';
+      
+      // Clear 3D scene
+      if (scene) {
+        buildingMeshes.forEach(mesh => scene.remove(mesh));
+        buildingMeshes = [];
+      }
+    }
+    
+    // ============================================================================
+    // BUILDING DATA FETCHING
+    // ============================================================================
+    
+    async function fetchBuildingData() {
+      if (!selectedPoint && !selectedPolygon) {
+        alert('Please select an area first!');
+        return;
+      }
+      
+      showLoading(true);
+      
+      // TODO: Integrate with backend API to fetch real building data
+      console.log('Selection data:', getSelectionData());
+      
+      showLoading(false);
+      alert('Building data fetch will be implemented with backend integration');
+    }
+    
+    // ============================================================================
+    // 3D VISUALIZATION
+    // ============================================================================
+    
+    function generate3DView() {
+      showLoading(true);
+      
+      // TODO: Integrate with backend API to generate 3D scene with real building data
+      console.log('3D view generation requested with:', getSelectionData());
+      
+      showLoading(false);
+      alert('3D view generation will be implemented with backend integration');
+    }
+    
+    // ============================================================================
+    // SHADOW ANALYSIS
+    // ============================================================================
+    
+    function analyzeShadows() {
+      if (!selectedPoint && !selectedPolygon) {
+        alert('Please select an area first!');
+        return;
+      }
+      
+      showLoading(true);
+      
+      // TODO: Integrate with backend API for solar shadow analysis
+      console.log('Shadow analysis requested with:', getSelectionData());
+      
+      showLoading(false);
+      alert('Shadow analysis will be implemented with backend integration');
+    }
+    
+    // ============================================================================
+    // PANEL TOGGLE FUNCTIONS
+    // ============================================================================
+    
+    function toggleControlPanel() {
+      const panel = document.getElementById('control-panel');
+      const toggleBtn = document.querySelector('.toggle-control-panel');
+      
+      panel.classList.toggle('collapsed');
+      toggleBtn.classList.toggle('hidden');
+    }
+    
+    function toggleViewportControls() {
+      const controls = document.getElementById('viewport-controls');
+      const toggleBtn = document.querySelector('.toggle-viewport-controls');
+      
+      controls.classList.toggle('collapsed');
+      toggleBtn.classList.toggle('hidden');
+    }
+    
+    function toggleViewportPanel() {
+      const panel = document.getElementById('viewport-panel');
+      const toggleBtn = document.querySelector('.toggle-viewport-panel');
+      const toggleText = document.getElementById('viewport-toggle-text');
+      
+      panel.classList.toggle('collapsed');
+      toggleBtn.classList.toggle('show-panel');
+      
+      // Update button icon and title
+      if (panel.classList.contains('collapsed')) {
+        toggleBtn.innerHTML = '🏙️';
+        toggleBtn.title = 'Show 3D Viewport';
+        if (toggleText) {
+          toggleText.textContent = '🏙️ Show 3D Viewport';
+        }
+      } else {
+        toggleBtn.innerHTML = '❯';
+        toggleBtn.title = 'Hide 3D Viewport';
+        if (toggleText) {
+          toggleText.textContent = '❯ Hide 3D Viewport';
+        }
+      }
+    }
+    
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+    
+    function getSelectionData() {
+      // Returns the current selection data in a format ready for API calls
+      const data = {
+        mode: currentMode,
+        date: document.getElementById('analysis-date').value,
+        time: document.getElementById('time-value').textContent,
+        timezone: document.getElementById('timezone').value
+      };
+      
+      if (currentMode === 'point' && selectedPoint) {
+        const latlng = selectedPoint.getLatLng();
+        data.point = {
+          lat: latlng.lat,
+          lng: latlng.lng,
+          bufferRadius: parseInt(document.getElementById('buffer-radius').value)
+        };
+      } else if (selectedPolygon) {
+        const bounds = selectedPolygon.getBounds();
+        const coords = selectedPolygon.getLatLngs()[0].map(ll => [ll.lat, ll.lng]);
+        data.polygon = {
+          coordinates: coords,
+          center: {
+            lat: bounds.getCenter().lat,
+            lng: bounds.getCenter().lng
+          }
+        };
+      }
+      
+      return data;
+    }
+    
+    function showLoading(show) {
+      const overlay = document.getElementById('loading-overlay');
+      if (show) {
+        overlay.classList.add('active');
+      } else {
+        overlay.classList.remove('active');
+      }
+    }
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      if (camera && renderer) {
+        const container = document.getElementById('viewport-3d');
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      }
+    });
+    
+    // ============================================================================
+    // INITIALIZE
+    // ============================================================================
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      initMap();
+    });
+  </script>
+</body>
+</html>
