@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GIS File Upload PoC</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        #responseOutput { background: #f4f4f4; border: 1px solid #ccc; padding: 10px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Upload File for Performance Test</h1>
+    <p>This form tests the backend upload and parse speed. The results will appear here and in the Python terminal.</p>
+    
+    <form id="uploadForm">
+        <label for="fileInput">Choose a file:</label>
+        <input type="file" id="fileInput" required>
+        <button type="submit" id="uploadButton">Upload and Test</button>
+    </form>
+    
+    <h3>Test Results:</h3>
+    <pre id="responseOutput">Waiting for test...</pre>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('fileInput');
+        const output = document.getElementById('responseOutput');
+        const button = document.getElementById('uploadButton');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const file = fileInput.files[0];
+            if (!file) {
+                output.textContent = 'Please select a file first.';
+                return;
+            }
+
+            output.textContent = 'Uploading and processing, please wait... This may take a while for large files.';
+            button.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/v1/uploads/custom-data', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.detail || 'An unknown error occurred.');
+                }
+                
+                // Format the JSON for nice printing
+                output.textContent = JSON.stringify(result, null, 2);
+
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+            } finally {
+                button.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
