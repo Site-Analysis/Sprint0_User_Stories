@@ -77,3 +77,11 @@ with `multipart/form-data` containing the file under the key `file`.
   - Raster files: opened with `rasterio`.
 - CORS
   - If your browser blocks requests from a `file://` origin, add CORS middleware in `main.py` (optional for local PoC).
+
+## 7) Sprint1 User Stories Summary
+
+Project note carried over from remote branch:
+
+> Sprint1_User_Stories – Tests Done for Sprint1 User Stories
+
+This README consolidates both the PoC documentation and the prior sprint testing note.
